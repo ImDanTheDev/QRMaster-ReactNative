@@ -22,12 +22,14 @@ interface Props {
 
 const CreatorScreen: NavigationFunctionComponent<Props> = (props: Props) => {
     const [qrText, setQRText] = useState(props.qrData?.text || '');
+    const [qrName, setQRName] = useState(props.qrData?.name || '');
 
     /** Calls the onSaveQRCode callback and navigates to the previous screen. */
     const handleSaveBtn = async () => {
         await props.onSaveQRCode({
             id: props.qrData?.id || uuid.v4() as string,
-            text: qrText
+            text: qrText,
+            name: qrName
         });
         await Navigation.pop(props.componentId);
     }
@@ -47,6 +49,7 @@ const CreatorScreen: NavigationFunctionComponent<Props> = (props: Props) => {
     return (
         <View style={styles.creator}>
             <TextInput value={qrText} onChangeText={setQRText} placeholder='Enter QR code text'/>
+            <TextInput value={qrName} onChangeText={setQRName} placeholder='Enter searchable name'/>
             {renderPreview()}
             <View style={styles.vFiller}/>
             <Button onPress={handleSaveBtn} title='Save' />
