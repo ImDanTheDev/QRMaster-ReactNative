@@ -5,6 +5,8 @@ import {
     StyleSheet,
     Dimensions,
     GestureResponderEvent,
+    TextInput,
+    Text,
 } from 'react-native';
 import { GestureEvent, HandlerStateChangeEvent, PinchGestureHandler, PinchGestureHandlerEventPayload, State } from 'react-native-gesture-handler';
 import { NavigationFunctionComponent } from 'react-native-navigation';
@@ -142,6 +144,24 @@ const PrintPreviewScreen: NavigationFunctionComponent<Props> = (props: Props) =>
     return (
         <View>
             <Button title='Print' onPress={handlePrint}/>
+            <View style={styles.labeledInputGroup}>
+                <Text>X</Text>
+                <TextInput keyboardType='decimal-pad' value={`${qrX}`} onChangeText={(text) => setQRX(Number.parseFloat(text) || 0)} />
+            </View>
+            <View style={styles.labeledInputGroup}>
+                <Text>Y</Text>
+                <TextInput keyboardType='decimal-pad' value={`${qrY}`} onChangeText={(text) => setQRY(Number.parseFloat(text) || 0)} />
+            </View>
+            <View style={styles.labeledInputGroup}>
+                <Text>Width</Text>
+                <TextInput keyboardType='decimal-pad' value={`${qrWidth}`} onChangeText={(text) => setQRWidth(Number.parseFloat(text) || 0)} />
+            </View>
+            <View style={styles.labeledInputGroup}>
+                <Text>Height</Text>
+                <TextInput keyboardType='decimal-pad' value={`${qrHeight}`} onChangeText={(text) => setQRHeight(Number.parseFloat(text) || 0)} />
+            </View>
+            
+            <TextInput keyboardType='decimal-pad' onChangeText={(text) => setQRX(Number.parseFloat(text))} />
             <View style={styles.preview} pointerEvents={'none'}>
                 <RenderHTML source={{
                     html: generatePreviewHTML()
@@ -156,9 +176,13 @@ const PrintPreviewScreen: NavigationFunctionComponent<Props> = (props: Props) =>
 
 const previewWidth = window.width - (previewMargin * 2);
 const previewHeight = previewWidth * letterPaperAspectRatio;
-const previewTopMargin = 32;
+const previewTopMargin = 224;
 
 const styles = StyleSheet.create({
+    labeledInputGroup: {
+        marginHorizontal: 16,
+        flexDirection: 'row'
+    },
     preview: {
         position: 'absolute',
         top: previewTopMargin,
