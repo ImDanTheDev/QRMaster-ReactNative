@@ -16,7 +16,7 @@ interface Props {
     onSaveQRCode: (text: string) => Promise<void>;
 }
 
-const Creator: NavigationFunctionComponent<Props> = (props: Props) => {
+const CreatorScreen: NavigationFunctionComponent<Props> = (props: Props) => {
     const [qrText, setQRText] = useState('');
 
     /** Calls the onSaveQRCode callback and navigates to the previous screen. */
@@ -58,7 +58,7 @@ const styles = StyleSheet.create({
     },
 });
 
-Creator.options = {
+CreatorScreen.options = {
     topBar: {
         title: {
             text: 'Create QR Code'
@@ -66,6 +66,6 @@ Creator.options = {
     },
 };
 
-export default Creator;
+export default CreatorScreen;
 export type { Props };
 export const ComponentId = 'CreatorScreen';

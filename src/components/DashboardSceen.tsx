@@ -8,9 +8,9 @@ import {
 import { Navigation, NavigationFunctionComponent } from 'react-native-navigation';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import uuid from 'react-native-uuid';
-import RNPrint from 'react-native-print';
 
-import { ComponentId as CreatorId, Props as CreatorProps} from './Creator';
+import { ComponentId as CreatorId, Props as CreatorProps} from './CreatorScreen';
+import { ComponentId as PrintPreviewId, Props as PrintPreviewProps} from './PrintPreviewScreen';
 import IQRCodeData from '../IQRCodeData';
 import DashboardEntry from './DashboardEntry';
 
@@ -19,7 +19,7 @@ interface Props {
     componentId: string
 }
 
-const Dashboard: NavigationFunctionComponent<Props> = (props: Props) => {
+const DashboardScreen: NavigationFunctionComponent<Props> = (props: Props) => {
     // All loaded QR codes in the app.
     const [qrCodes, setQRCodes] = useState<IQRCodeData[]>([]);
 
@@ -79,22 +79,22 @@ const Dashboard: NavigationFunctionComponent<Props> = (props: Props) => {
         });
     }
 
-    /** Send a print-ready QR code document to the native print service. */
-    const handlePrint = async (base64: string) => {
-        await RNPrint.print({
-            html: `
-                <html>
-                <body>
-                <img src='data:image/png;base64, ${base64}'/>
-                </body>
-                </html>
-            `,
+    /** Opens the print preview screen for a QR code. */
+    const openPrintPreview = async (base64: string) => {
+        await Navigation.push<PrintPreviewProps>(props.componentId, {
+            component: {
+                name: PrintPreviewId,
+                passProps: {
+                    componentId: PrintPreviewId,
+                    base64
+                }
+            }
         });
     }
 
     /** Render a QR code list entry. */
     const renderQRCode: ListRenderItem<IQRCodeData> = ({item}) => (
-        <DashboardEntry qrCodeData={item} onDelete={handleDelete} onPrint={handlePrint}/>
+        <DashboardEntry qrCodeData={item} onDelete={handleDelete} onPrint={openPrintPreview}/>
     );
 
     return (
@@ -105,7 +105,7 @@ const Dashboard: NavigationFunctionComponent<Props> = (props: Props) => {
     )
 }
 
-Dashboard.options = {
+DashboardScreen.options = {
     topBar: {
         title: {
             text: 'Dashboard'
@@ -114,6 +114,6 @@ Dashboard.options = {
 };
 
 
-export default Dashboard;
+export default DashboardScreen;
 export type { Props };
 export const ComponentId = 'DashboardScreen';

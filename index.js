@@ -1,9 +1,19 @@
 import { Navigation } from 'react-native-navigation'
-import Creator, { ComponentId as CreatorId, Props as CreatorProps} from './src/components/Creator';
-import Dashboard, { ComponentId as DashboardId, Props as DashboardProps} from './src/components/Dashboard';
+import { gestureHandlerRootHOC } from 'react-native-gesture-handler';
 
-Navigation.registerComponent(DashboardId, () => Dashboard);
-Navigation.registerComponent(CreatorId, () => Creator);
+import CreatorScreen, { ComponentId as CreatorId, Props as CreatorProps} from './src/components/CreatorScreen';
+import DashboardScreen, { ComponentId as DashboardId, Props as DashboardProps} from './src/components/DashboardSceen';
+import PrintPreviewScreen, { ComponentId as PrintPreviewId, Props as PrintPreviewProps} from './src/components/PrintPreviewScreen';
+
+Navigation.registerComponent(DashboardId,
+  () => gestureHandlerRootHOC(DashboardScreen),
+  () => DashboardScreen);
+Navigation.registerComponent(CreatorId,
+  () => gestureHandlerRootHOC(CreatorScreen),
+  () => CreatorScreen);
+Navigation.registerComponent(PrintPreviewId,
+  () => gestureHandlerRootHOC(PrintPreviewScreen),
+  () => PrintPreviewScreen);
 Navigation.events().registerAppLaunchedListener(() => {
   Navigation.setRoot({
     root: {
