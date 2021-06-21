@@ -7,7 +7,6 @@ import {
 } from 'react-native';
 import { Navigation, NavigationFunctionComponent } from 'react-native-navigation';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import uuid from 'react-native-uuid';
 
 import { ComponentId as CreatorId, Props as CreatorProps} from './CreatorScreen';
 import { ComponentId as PrintPreviewId, Props as PrintPreviewProps} from './PrintPreviewScreen';
@@ -53,20 +52,17 @@ const DashboardScreen: NavigationFunctionComponent<Props> = (props: Props) => {
         writeQRCodes();
     }, [qrCodes]);
 
-    /** Add a QR code to the state. useEffect auto-saves the new code. */
-    const saveQRCode = async (text: string) => {
-        setQRCodes(() => [...qrCodes, {
-            id: uuid.v4() as string,
-            text,
-        }]);
+    /** Add or update a QR code to the state. useEffect auto-saves the new code. */
+    const saveQRCode = async (qrData: IQRCodeData) => {
+        setQRCodes(() => [...qrCodes.filter(i => i.id !== qrData.id), qrData]);
     }
 
     /** Removes a QR code from the state. useEffect auto-saves the change. */
-    const handleDelete = (qrCodeData: IQRCodeData) => {
-        setQRCodes(() => qrCodes.filter(i => i.id !== qrCodeData.id));
+    const handleDelete = (qrData: IQRCodeData) => {
+        setQRCodes(() => qrCodes.filter(i => i.id !== qrData.id));
     }
 
-    /** Opens the Creator screen on the navigation stack. */
+    /** Opens the Creator screen to create a new QR code. */
     const handleCreateBtn = async () => {
         await Navigation.push<CreatorProps>(props.componentId, {
             component: {
@@ -79,7 +75,7 @@ const DashboardScreen: NavigationFunctionComponent<Props> = (props: Props) => {
         });
     }
 
-    /** Opens the print preview screen for a QR code. */
+    /** Opens the PrintPreview screen for a QR code. */
     const openPrintPreview = async (base64: string) => {
         await Navigation.push<PrintPreviewProps>(props.componentId, {
             component: {
@@ -92,9 +88,23 @@ const DashboardScreen: NavigationFunctionComponent<Props> = (props: Props) => {
         });
     }
 
+    /** Opens the Creator screen to edit the QR code. */
+    const handlePress = async (qrData: IQRCodeData) => {
+        await Navigation.push<CreatorProps>(props.componentId, {
+            component: {
+                name: CreatorId,
+                passProps: {
+                    componentId: CreatorId,
+                    qrData,
+                    onSaveQRCode: saveQRCode
+                }
+            }
+        });
+    }
+
     /** Render a QR code list entry. */
     const renderQRCode: ListRenderItem<IQRCodeData> = ({item}) => (
-        <DashboardEntry qrCodeData={item} onDelete={handleDelete} onPrint={openPrintPreview}/>
+        <DashboardEntry qrCodeData={item} onPress={handlePress} onDelete={handleDelete} onPrint={openPrintPreview}/>
     );
 
     return (

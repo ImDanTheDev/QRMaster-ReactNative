@@ -2,6 +2,7 @@ import React, { useState, FC, useEffect } from 'react';
 import {
     View,
     Button,
+    TouchableOpacity,
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
@@ -14,6 +15,8 @@ interface Props {
     onDelete: (qrCodeData: IQRCodeData) => void;
     /** Callback to print this QR code. */
     onPrint: (base64: string) => Promise<void>;
+    /** Calback when the entry is pressed. */
+    onPress: (qrCodeData: IQRCodeData) => Promise<void>
 }
 
 const DashboardEntry: FC<Props> = (props: Props) => {
@@ -38,9 +41,16 @@ const DashboardEntry: FC<Props> = (props: Props) => {
         props.onDelete(props.qrCodeData);
     }
 
+    /** Calls the onPress callback. */
+    const handlePress = async () => {
+        await props.onPress(props.qrCodeData);
+    }
+
     return (
         <View>
-            <QRCode value={props.qrCodeData.text} getRef={setSVG}/>
+            <TouchableOpacity onPress={handlePress}>
+                <QRCode value={props.qrCodeData.text} getRef={setSVG}/>
+            </TouchableOpacity>
             <Button onPress={handlePrintQRCode} title='Print' />
             <Button onPress={deleteQRCode} title='Delete' />
         </View>

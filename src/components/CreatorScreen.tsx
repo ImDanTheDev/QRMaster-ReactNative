@@ -8,20 +8,27 @@ import {
 } from 'react-native';
 import { Navigation, NavigationFunctionComponent } from 'react-native-navigation';
 import QRCode from 'react-native-qrcode-svg';
+import uuid from 'react-native-uuid';
+import IQRCodeData from '../IQRCodeData';
 
 interface Props {
     /** react-native-navigation component id. */
     componentId: string;
     /** Callback that contains the QR code text. */
-    onSaveQRCode: (text: string) => Promise<void>;
+    onSaveQRCode: (qrData: IQRCodeData) => Promise<void>;
+    /** Existing QR to edit. */
+    qrData?: IQRCodeData
 }
 
 const CreatorScreen: NavigationFunctionComponent<Props> = (props: Props) => {
-    const [qrText, setQRText] = useState('');
+    const [qrText, setQRText] = useState(props.qrData?.text || '');
 
     /** Calls the onSaveQRCode callback and navigates to the previous screen. */
     const handleSaveBtn = async () => {
-        await props.onSaveQRCode(qrText);
+        await props.onSaveQRCode({
+            id: props.qrData?.id || uuid.v4() as string,
+            text: qrText
+        });
         await Navigation.pop(props.componentId);
     }
 
@@ -39,7 +46,7 @@ const CreatorScreen: NavigationFunctionComponent<Props> = (props: Props) => {
 
     return (
         <View style={styles.creator}>
-            <TextInput onChangeText={setQRText} placeholder='Enter QR code text'/>
+            <TextInput value={qrText} onChangeText={setQRText} placeholder='Enter QR code text'/>
             {renderPreview()}
             <View style={styles.vFiller}/>
             <Button onPress={handleSaveBtn} title='Save' />
