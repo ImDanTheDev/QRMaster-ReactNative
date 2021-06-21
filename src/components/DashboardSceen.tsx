@@ -4,6 +4,7 @@ import {
     FlatList,
     Button,
     ListRenderItem,
+    TextInput,
 } from 'react-native';
 import { Navigation, NavigationFunctionComponent } from 'react-native-navigation';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -21,6 +22,7 @@ interface Props {
 const DashboardScreen: NavigationFunctionComponent<Props> = (props: Props) => {
     // All loaded QR codes in the app.
     const [qrCodes, setQRCodes] = useState<IQRCodeData[]>([]);
+    const [searchPhrase, setSearchPhrase] = useState<string>('');
 
     // Runs once on component mount.
     useEffect(() => {
@@ -28,14 +30,15 @@ const DashboardScreen: NavigationFunctionComponent<Props> = (props: Props) => {
         const readQRCodes = async () => {
             try {
                 const jsonQRCodes: string = await AsyncStorage.getItem('@qrCodes') || JSON.stringify(qrCodes);
-                setQRCodes(JSON.parse(jsonQRCodes));
+                const savedQRCodes: IQRCodeData[] = JSON.parse(jsonQRCodes);
+                setQRCodes(savedQRCodes);
             } catch (e) {
                 console.error(e);
             }
         }
 
         readQRCodes();
-    }, []);
+    }, [searchPhrase]);
 
     // Runs when the qrCodes array changes
     useEffect(() => {
@@ -107,10 +110,16 @@ const DashboardScreen: NavigationFunctionComponent<Props> = (props: Props) => {
         <DashboardEntry qrCodeData={item} onPress={handlePress} onDelete={handleDelete} onPrint={openPrintPreview}/>
     );
 
+    /** Return QR codes with names that start with the search phrase. */
+    const getFilteredQRCodes = (): IQRCodeData[] => {
+        return qrCodes.filter(qrCode => qrCode.name.startsWith(searchPhrase));
+    }
+
     return (
         <View>
+            <TextInput onChangeText={setSearchPhrase} />
             <Button onPress={handleCreateBtn} title='Create'/>
-            <FlatList data={qrCodes} renderItem={renderQRCode} keyExtractor={item => item.id} />
+            <FlatList data={getFilteredQRCodes()} renderItem={renderQRCode} keyExtractor={item => item.id} />
         </View>
     )
 }
