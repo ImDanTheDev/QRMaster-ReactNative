@@ -11,6 +11,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { ComponentId as CreatorId, Props as CreatorProps} from './CreatorScreen';
 import { ComponentId as PrintPreviewId, Props as PrintPreviewProps} from './PrintPreviewScreen';
+import { ComponentId as ScannerButtonId} from './ScannerButton';
+import { ComponentId as ScannerId, Props as ScannerProps} from './ScannerScreen';
 import IQRCodeData from '../IQRCodeData';
 import DashboardEntry from './DashboardEntry';
 
@@ -24,7 +26,28 @@ const DashboardScreen: NavigationFunctionComponent<Props> = (props: Props) => {
     const [qrCodes, setQRCodes] = useState<IQRCodeData[]>([]);
     const [searchPhrase, setSearchPhrase] = useState<string>('');
 
-    // Runs once on component mount.
+    const [newQRCode, setNewQRCode] = useState<IQRCodeData>();
+
+    // Runs once on component mount
+    useEffect(() => {
+        Navigation.mergeOptions(props.componentId, {
+            topBar: {
+                rightButtons: [
+                    {
+                        id: 'openScannerBtn',
+                        component: {
+                            name: ScannerButtonId,
+                            passProps: {
+                                onOpenScanner: handleOpenScanner
+                            }
+                        }
+                    }
+                ]
+            }
+        });
+    }, []);
+
+    // Runs once on component mount and when search phrase changes.
     useEffect(() => {
         /** Load saved QR codes from storage or default to empty array. */
         const readQRCodes = async () => {
@@ -55,9 +78,50 @@ const DashboardScreen: NavigationFunctionComponent<Props> = (props: Props) => {
         writeQRCodes();
     }, [qrCodes]);
 
+    // Runs when a QR code is scanned.
+    useEffect(() => {
+        if (newQRCode) {
+            // Merge the scanned QR code into array.
+            setQRCodes([...qrCodes, newQRCode]);
+        }
+    }, [newQRCode]);
+
+    /** Open the Creator screen for the scanned QR code. */
+    const handleScan = async (qrText: string) => {
+        await Navigation.push<CreatorProps>(props.componentId, {
+            component: {
+                name: CreatorId,
+                passProps: {
+                    componentId: CreatorId,
+                    qrData: {
+                        text: qrText
+                    },
+                    onSaveQRCode: async (qrData: IQRCodeData) => {
+                        // Store the QR data to be merged in later.
+                        setNewQRCode(qrData);
+                    }
+                }
+            }
+        });
+    }
+
+    /** Open the scanner screen. */
+    const handleOpenScanner = async () => {
+        await Navigation.push<ScannerProps>(props.componentId, {
+            component: {
+                name: ScannerId,
+                passProps: {
+                    componentId: ScannerId,
+                    onScan: handleScan
+                }
+            }
+        });
+    }
+
     /** Add or update a QR code to the state. useEffect auto-saves the new code. */
     const saveQRCode = async (qrData: IQRCodeData) => {
-        setQRCodes(() => [...qrCodes.filter(i => i.id !== qrData.id), qrData]);
+        const a = [...qrCodes.filter(i =>i.id !== qrData.id), qrData];
+        setQRCodes(() => a);
     }
 
     /** Removes a QR code from the state. useEffect auto-saves the change. */
@@ -78,19 +142,6 @@ const DashboardScreen: NavigationFunctionComponent<Props> = (props: Props) => {
         });
     }
 
-    /** Opens the PrintPreview screen for a QR code. */
-    const openPrintPreview = async (base64: string) => {
-        await Navigation.push<PrintPreviewProps>(props.componentId, {
-            component: {
-                name: PrintPreviewId,
-                passProps: {
-                    componentId: PrintPreviewId,
-                    base64
-                }
-            }
-        });
-    }
-
     /** Opens the Creator screen to edit the QR code. */
     const handlePress = async (qrData: IQRCodeData) => {
         await Navigation.push<CreatorProps>(props.componentId, {
@@ -105,6 +156,19 @@ const DashboardScreen: NavigationFunctionComponent<Props> = (props: Props) => {
         });
     }
 
+    /** Opens the PrintPreview screen for a QR code. */
+    const openPrintPreview = async (base64: string) => {
+        await Navigation.push<PrintPreviewProps>(props.componentId, {
+            component: {
+                name: PrintPreviewId,
+                passProps: {
+                    componentId: PrintPreviewId,
+                    base64
+                }
+            }
+        });
+    }
+
     /** Render a QR code list entry. */
     const renderQRCode: ListRenderItem<IQRCodeData> = ({item}) => (
         <DashboardEntry qrCodeData={item} onPress={handlePress} onDelete={handleDelete} onPrint={openPrintPreview}/>
@@ -112,14 +176,14 @@ const DashboardScreen: NavigationFunctionComponent<Props> = (props: Props) => {
 
     /** Return QR codes with names that start with the search phrase. */
     const getFilteredQRCodes = (): IQRCodeData[] => {
-        return qrCodes.filter(qrCode => qrCode.name.startsWith(searchPhrase));
+        return qrCodes.filter(qrCode => qrCode.name?.startsWith(searchPhrase));
     }
 
     return (
         <View>
             <TextInput onChangeText={setSearchPhrase} />
             <Button onPress={handleCreateBtn} title='Create'/>
-            <FlatList data={getFilteredQRCodes()} renderItem={renderQRCode} keyExtractor={item => item.id} />
+            <FlatList data={getFilteredQRCodes()} renderItem={renderQRCode} keyExtractor={item => item.id || ''} />
         </View>
     )
 }
@@ -128,7 +192,7 @@ DashboardScreen.options = {
     topBar: {
         title: {
             text: 'Dashboard'
-        },
+        }
     },
 };
 

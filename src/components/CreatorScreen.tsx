@@ -27,11 +27,11 @@ const CreatorScreen: NavigationFunctionComponent<Props> = (props: Props) => {
     /** Calls the onSaveQRCode callback and navigates to the previous screen. */
     const handleSaveBtn = async () => {
         await props.onSaveQRCode({
-            id: props.qrData?.id || uuid.v4() as string,
+            id: props.qrData?.id || (uuid.v4() as string),
             text: qrText,
             name: qrName
         });
-        await Navigation.pop(props.componentId);
+        await Navigation.popToRoot(props.componentId);
     }
 
     /** Render a preview of the QR code if possible. */

@@ -9,12 +9,13 @@
     "test": "jest",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "reload": "adb shell input keyevent 82 && adb shell input keyevent 66 && adb shell input keyevent 66",
-    "devmenu":"adb shell input keyevent 82"
+    "devmenu": "adb shell input keyevent 82"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^1.15.5",
     "react": "17.0.1",
     "react-native": "0.64.1",
+    "react-native-camera": "^3.44.1",
     "react-native-gesture-handler": "^1.10.3",
     "react-native-navigation": "^7.16.0",
     "react-native-print": "^0.8.0",
