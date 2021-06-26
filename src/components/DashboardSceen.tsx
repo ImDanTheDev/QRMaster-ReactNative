@@ -6,20 +6,22 @@ import {
     TextInput,
     Text,
     TouchableOpacity,
+    StyleSheet
 } from 'react-native';
-import { Navigation, NavigationFunctionComponent } from 'react-native-navigation';
+import { Navigation, NavigationFunctionComponent, OptionsModalPresentationStyle } from 'react-native-navigation';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-import { ComponentId as CreatorId, Props as CreatorProps} from './CreatorScreen';
-import { ComponentId as PrintPreviewId, Props as PrintPreviewProps} from './PrintPreviewScreen';
-import { ComponentId as ScannerId, Props as ScannerProps} from './ScannerScreen';
-import IQRCodeData from '../IQRCodeData';
-import DashboardEntry from './DashboardEntry';
-import { StyleSheet } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import uuid from 'react-native-uuid';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import Entypo from 'react-native-vector-icons/Entypo';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import IQRCodeData from '../IQRCodeData';
+import DashboardEntry from './DashboardEntry';
+import IGroupData from '../IGroupData';
+import GroupEntry from './GroupEntry';
+import { ComponentId as CreatorId, Props as CreatorProps} from './CreatorScreen';
+import { ComponentId as AddGroupModalId} from './AddGroupModal';
+import { ComponentId as ScannerId, Props as ScannerProps} from './ScannerScreen';
 
 interface Props {
     /** react-native-navigation component id. */
@@ -27,14 +29,30 @@ interface Props {
 }
 
 const DashboardScreen: NavigationFunctionComponent<Props> = (props: Props) => {
-    // All loaded QR codes in the app.
+
     const [qrCodes, setQRCodes] = useState<IQRCodeData[]>([]);
+    const [groups, setGroups] = useState<IGroupData[]>([{ // Initialize storage with a default group(mainly for new app installs).
+        name: 'Default',
+        id: 'default'
+    }]);
+    const [openedGroupIndex, setOpenedGroupIndex] = useState<number>(0);
     const [searchPhrase, setSearchPhrase] = useState<string>('');
     const [newQRCode, setNewQRCode] = useState<IQRCodeData>();
     const [searching, setSearching] = useState<boolean>(false);
 
     // Runs once on component mount and when search phrase changes.
     useEffect(() => {
+        /** Load groups from storage or default to one default group. */
+        const readGroups = async () => {
+            try {
+                const jsonGroups: string = await AsyncStorage.getItem('@groups') || JSON.stringify(groups);
+                const savedGroups: IGroupData[] = JSON.parse(jsonGroups);
+                setGroups(savedGroups);
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
         /** Load saved QR codes from storage or default to empty array. */
         const readQRCodes = async () => {
             try {
@@ -45,11 +63,12 @@ const DashboardScreen: NavigationFunctionComponent<Props> = (props: Props) => {
                 console.error(e);
             }
         }
-
+        
+        readGroups();
         readQRCodes();
     }, [searchPhrase]);
 
-    // Runs when the qrCodes array changes
+    // Runs when the qrCodes array changes.
     useEffect(() => {
         /** Save all QR codes to storage. */
         const writeQRCodes = async () => {
@@ -63,6 +82,21 @@ const DashboardScreen: NavigationFunctionComponent<Props> = (props: Props) => {
 
         writeQRCodes();
     }, [qrCodes]);
+
+    // Runs when groups array changes.
+    useEffect(() => {
+        /** Save all groups to storage. */
+        const writeGroups = async () => {
+            try {
+                const jsonGroups = JSON.stringify(groups);
+                await AsyncStorage.setItem('@groups', jsonGroups);
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        writeGroups();
+    }, [groups])
 
     // Runs when a QR code is scanned.
     useEffect(() => {
@@ -80,12 +114,14 @@ const DashboardScreen: NavigationFunctionComponent<Props> = (props: Props) => {
                 passProps: {
                     componentId: CreatorId,
                     qrData: {
-                        text: qrText
+                        text: qrText,
+                        groupId: 'default'
                     },
                     onSaveQRCode: async (qrData: IQRCodeData) => {
                         // Store the QR data to be merged in later.
                         setNewQRCode(qrData);
-                    }
+                    },
+                    onDelete: handleDelete
                 }
             }
         });
@@ -106,7 +142,7 @@ const DashboardScreen: NavigationFunctionComponent<Props> = (props: Props) => {
 
     /** Add or update a QR code to the state. useEffect auto-saves the new code. */
     const saveQRCode = async (qrData: IQRCodeData) => {
-        const a = [...qrCodes.filter(i =>i.id !== qrData.id), qrData];
+        const a = [...qrCodes.filter(i => i.id !== qrData.id), qrData];
         setQRCodes(() => a);
     }
 
@@ -122,65 +158,168 @@ const DashboardScreen: NavigationFunctionComponent<Props> = (props: Props) => {
                 name: CreatorId,
                 passProps: {
                     componentId: CreatorId,
-                    onSaveQRCode: saveQRCode
+                    onSaveQRCode: saveQRCode,
+                    onDelete: handleDelete
                 }
             }
         });
     }
 
     /** Opens the Creator screen to edit the QR code. */
-    const handlePress = async (qrData: IQRCodeData) => {
+    const handleQRPress = async (qrData: IQRCodeData) => {
         await Navigation.push<CreatorProps>(props.componentId, {
             component: {
                 name: CreatorId,
                 passProps: {
                     componentId: CreatorId,
                     qrData,
-                    onSaveQRCode: saveQRCode
+                    onSaveQRCode: saveQRCode,
+                    onDelete: handleDelete
                 }
             }
         });
     }
 
-    /** Opens the PrintPreview screen for a QR code. */
-    const openPrintPreview = async (base64: string) => {
-        await Navigation.push<PrintPreviewProps>(props.componentId, {
-            component: {
-                name: PrintPreviewId,
-                passProps: {
-                    componentId: PrintPreviewId,
-                    base64
-                }
+    /** Shows a modal to gather group data and save it to storage. */
+    const handleAddGroupBtn = async (): Promise<string> => {
+        /** Save the group. */
+        const handleSave = (groupName: string) => {
+            setGroups([...groups, {
+                id: (uuid.v4() as string),
+                name: groupName,
+            }]);
+        }
+
+        await Navigation.showModal({
+            stack: {
+                children: [
+                    {
+                        component: {
+                            name: AddGroupModalId,
+                            options: {
+                                topBar: {
+                                    visible: false
+                                },
+                                modalPresentationStyle: OptionsModalPresentationStyle.overCurrentContext,
+                                layout: {
+                                    backgroundColor: 'transparent'
+                                }
+                            },
+                            passProps: {
+                                onSave: handleSave
+                            }
+                        }
+                    }
+                ]
             }
-        });
+        })
+        return '';
     }
 
     /** Render a QR code list entry. */
     const renderQRCode: ListRenderItem<IQRCodeData> = ({item}) => (
-        <DashboardEntry qrCodeData={item} onPress={handlePress} onDelete={handleDelete} onPrint={openPrintPreview}/>
+        <DashboardEntry qrCodeData={item} groups={groups} onPress={handleQRPress} onChangeGroup={saveQRCode}/>
     );
 
     /** Return QR codes with names that start with the search phrase. */
     const getFilteredQRCodes = (): IQRCodeData[] => {
-        return qrCodes.filter(qrCode => qrCode.name?.startsWith(searchPhrase));
+        if (openedGroupIndex === -1) // Show all QR codes if no group is selected.
+        {
+            return qrCodes.filter(qrCode => qrCode.name?.startsWith(searchPhrase));
+        } else { // Show QR codes in a group and match the search phrase.
+            return qrCodes.filter(qrCode => `${qrCode.groupId}` === groups[openedGroupIndex].id && qrCode.name?.startsWith(searchPhrase));
+        }
+    }
+
+    /** Delete a group from storage. Moves QR codes from deleted group to default group. */
+    const handleDeleteGroup = (groupIndex: number) => {
+        const groupId = groups[groupIndex].id;
+        // Move QR codes from deleted group to default group.
+        qrCodes.filter(x => x.groupId === groupId).forEach(x => {
+            x.groupId = 'default';
+        });
+        setQRCodes(qrCodes);
+
+        // Delete the group.
+        setGroups(() => groups.filter(x => x.id !== groupId));
+    }
+
+    /** Toggle search bar visibility and clear it when hiding. */
+    const toggleSearchBar = () => {
+        if (searching) {
+            setSearchPhrase('');
+        }
+        setSearching(!searching);
+        setOpenedGroupIndex(-1);
+    }
+
+    // Generate GroupEntry's for each group in a grid layout.
+    const renderGroups = () => {
+        const groupRows: React.ReactElement[] = [];
+
+        const isLastRowFull = groups.length % 3 == 0;
+        const rows = Math.ceil(groups.length / 3);
+
+        const renderRowContents = (rowIndex: number, fullRow: boolean): React.ReactElement[] => {
+            const groupEntries: React.ReactElement[] = [];
+
+            const groupCount = fullRow ? 3 : groups.length % 3;
+            for(let i = 0; i < 3; i++) {
+                const groupIndex = rowIndex * 3 + i;
+                
+                groupEntries.push(
+                    <GroupEntry key={i} group={groups[groupIndex] || {}} disabled={i > groupCount - 1} isOpen={groupIndex === openedGroupIndex} onClose={() => {
+                        setOpenedGroupIndex(-1);
+                    }} onOpen={() => {
+                        setOpenedGroupIndex(groupIndex);
+                    }} onDeleteGroup={() => {
+                        handleDeleteGroup(groupIndex);
+                    }} />
+                );
+            }
+
+            return groupEntries;
+        }
+
+        for(let i = 0; i < rows; i++)
+        {
+            groupRows.push(
+                <View key={i} style={styles.groupRow}>
+                    {renderRowContents(i, i === rows - 1 ? isLastRowFull : true)}
+                </View>
+            );
+        }
+
+        return groupRows;
     }
 
     /** Render groups and sub-headers */
-    const renderListHeader = (): React.ReactElement => {
+    const renderHeader = (): React.ReactElement => {
         return (
-            <View>
-                <View style={styles.groupsSection}>
+            <View style={styles.listHeader}>
+                <View>
                     <View style={styles.subHeader}>
                         <Text style={styles.subHeaderTitle}>GROUPS</Text>
                         <View style={styles.flexFiller}/>
-                        <Text style={styles.subHeaderAction}>View all</Text>
+                        <TouchableOpacity style={styles.addGroupBtn} onPress={handleAddGroupBtn}>
+                            <Text style={styles.subHeaderAction}>Add Group</Text>
+                            <FontAwesome5 name={'plus'} size={20} color={'gray'}/>
+                        </TouchableOpacity>
                     </View>
                     <View style={styles.groupsList}>
-                        <Text style={styles.noGroupsLabel}>No groups</Text>
+                        {renderGroups()}
                     </View>
                 </View>
                 <View style={styles.subHeader}>
                     <Text style={styles.subHeaderTitle}>QR CODES</Text>
+                    {(openedGroupIndex < 0) ? (searching ? (
+                        <Text style={styles.subHeaderHint}>(in search results)</Text>
+                    ) : (
+                        <Text style={styles.subHeaderHint}>(in all groups)</Text>)
+                    ) : (
+                        <Text style={styles.subHeaderHint}>(in group: {groups[openedGroupIndex].name})</Text>
+                    )}
+                    
                 </View>
             </View>
         )
@@ -193,23 +332,19 @@ const DashboardScreen: NavigationFunctionComponent<Props> = (props: Props) => {
         )
     }
 
-    /** Toggle search bar visibility and clear it when hiding. */
-    const toggleSearchBar = () => {
-        if (searching) {
-            setSearchPhrase('');
-        }
-        setSearching(!searching);
-    }
-
     return (
         <View style={styles.dashboard}>
             <LinearGradient style={styles.background} colors={['#FFFFFF','#F2F1F6']} >
                 <View style={styles.content}>
-                    <FlatList style={styles.qrCodesList} removeClippedSubviews={false} ListHeaderComponent={renderListHeader} ListFooterComponent={renderListFooter} data={getFilteredQRCodes()} renderItem={renderQRCode} keyExtractor={item => item.id || ''} />
+                    <FlatList style={styles.qrCodesList} removeClippedSubviews={false} ListHeaderComponentStyle={{
+                        flexGrow: 1,
+                        flexShrink: 0,
+                        flexDirection: 'column'
+                    }} ListHeaderComponent={renderHeader} ListFooterComponent={renderListFooter} data={getFilteredQRCodes()} renderItem={renderQRCode} keyExtractor={item => item.id || ''} />
                     <LinearGradient start={{x: 0, y: 0.75}} end={{x: 0, y: 1}} colors={['#FFFFFFFF','#FFFFFF00']}>
                         <View style={styles.header}>
                             {searching ? (
-                                <TextInput style={styles.searchBar} onChangeText={setSearchPhrase}/>
+                                <TextInput style={styles.searchBar} placeholderTextColor={'gray'} placeholder='Enter search phrase...' onChangeText={setSearchPhrase}/>
                             ) : (
                                 <Text style={styles.title}>Your QR Codes</Text>
                             )}
@@ -219,17 +354,20 @@ const DashboardScreen: NavigationFunctionComponent<Props> = (props: Props) => {
                         </View>
                     </LinearGradient>
                 </View>
+                <View style={styles.bottomBarBackground}>
+                </View>
                 <View style={styles.bottomBar}>
                     <TouchableOpacity style={styles.bottomBarBtn}>
                         <Entypo name={'grid'} size={48} color={'#3e3e3e'}/>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.bottomBarPrimaryBtn} onPress={handleCreateBtn}>
+                    <TouchableOpacity style={styles.bottomBarPrimaryBtn} onPressIn={handleCreateBtn}>
                         <FontAwesome5 name={'plus'} size={38} color={'#FFF'}/>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.bottomBarBtn} onPress={handleOpenScanner}>
                         <Ionicons name={'scan'} size={38} color={'#3e3e3e'}/>
                     </TouchableOpacity>
                 </View>
+                
             </LinearGradient>
         </View>
     )
@@ -242,12 +380,13 @@ const styles = StyleSheet.create({
     },
     background: {
         flex: 1,
-        flexDirection: 'column'
+        flexDirection: 'column',
     },
     content: {
         paddingHorizontal: 16,
         flexDirection: 'column-reverse',
-        flex: 1
+        flex: 1,
+        marginBottom: 32,
     },
     header: {
         flexShrink: 1,
@@ -272,48 +411,63 @@ const styles = StyleSheet.create({
     },
     searchBar: {
         flex: 1,
-        backgroundColor: '#F2F1F6',
+        backgroundColor: '#FFF',
         borderRadius: 16,
         color: '#000',
         paddingHorizontal: 16,
-        fontSize: 16
+        fontSize: 16,
+
+        shadowColor: "#000",
+        shadowOffset: {
+            width: 0,
+            height: 4,
+        },
+        shadowOpacity: 0.30,
+        shadowRadius: 4.65,
+        elevation: 8,
     },
-    groupsSection: {
-        flexShrink: 1,
-        minHeight: 96,
+    listHeader: {
+        flexGrow: 1,
+        flexDirection: 'column',
+        marginHorizontal: 16
     },
     groupsList: {
-        flex: 1,
         flexDirection: 'column',
     },
-    noGroupsLabel: {
-        flexGrow: 1,
-        alignSelf: 'center',
-        textAlignVertical: 'center',
-        fontSize: 18,
-        color: 'gray',
+    groupRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between'
     },
     subHeader: {
-        flexShrink: 1,
         flexDirection: 'row',
-        margin: 16
     },
     subHeaderTitle: {
         color: 'gray',
         alignSelf: 'center',
         fontSize: 18,
         fontWeight: 'bold',
+        padding: 8
+    },
+    subHeaderHint: {
+        color: 'gray',
+        alignSelf: 'center',
+        fontSize: 18,
+        fontStyle: 'italic',
+        paddingVertical: 8
     },
     subHeaderAction: {
         color: 'gray',
         alignSelf: 'center',
         fontSize: 18,
+        paddingRight: 8
     },
     flexFiller: {
         flex: 1,
     },
-    qrCodesSection: {
-        flexGrow: 1,
+    addGroupBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 8
     },
     qrCodesList: {
         flexGrow: 1,
@@ -321,14 +475,21 @@ const styles = StyleSheet.create({
     },
     bottomBar: {
         flexShrink: 0,
-        minHeight: 96,
-        backgroundColor: '#FFF',
-        borderTopLeftRadius: 16,
-        borderTopRightRadius: 16,
+        minHeight: 128,
         flexDirection: 'row',
         justifyContent: 'space-between',
         paddingHorizontal: 32,
-
+        elevation: 16
+    },
+    bottomBarBackground: {
+        backgroundColor: '#FFF',
+        borderTopLeftRadius: 16,
+        borderTopRightRadius: 16,
+        minHeight: 96,
+        bottom: 0,
+        left: 0,
+        right: 0,
+        position: 'absolute',
         shadowColor: "#000",
         shadowOffset: {
             width: 0,
@@ -341,7 +502,7 @@ const styles = StyleSheet.create({
     bottomBarBtn: {
         width: 48,
         height: 48,
-        marginTop: 8,
+        marginTop: 8+32,
         borderRadius: 16,
         justifyContent: 'center',
         alignItems: 'center'
@@ -350,7 +511,6 @@ const styles = StyleSheet.create({
         backgroundColor: '#5AF0AB',
         borderRadius: 16,
         position: 'relative',
-        top: -64/2,
         width: 64,
         height: 64,
         shadowColor: "#000",
@@ -362,7 +522,7 @@ const styles = StyleSheet.create({
         shadowRadius: 1.41,
         elevation: 2,
         justifyContent: 'center',
-        alignItems: 'center'
+        alignItems: 'center',
     }
 });
 

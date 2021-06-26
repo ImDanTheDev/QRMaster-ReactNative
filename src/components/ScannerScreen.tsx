@@ -16,7 +16,7 @@ interface Props {
 const ScannerScreen: NavigationFunctionComponent<Props> = (props: Props) => {
 
     // Flag to detect the first scan. RNCamera may rapidly scan the QR code multiple times.
-    const [scanned, setScanned] = useState(false);
+    const [scanned, setScanned] = useState<boolean>(false);
 
     /** Call the onScan callback with the scanned QR data */
     const handleReadQR = (e: BarCodeReadEvent) => {
